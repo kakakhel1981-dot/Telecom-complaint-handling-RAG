@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+.venv/
+venv/
+env/
+
+# Secrets and local environment
+.env
+.env.*
+.streamlit/secrets.toml
+
+# Local data / generated indexes
+*.pdf
+*.faiss
+*.index
+*.pkl
+*.pickle
+.DS_Store
+Thumbs.db
