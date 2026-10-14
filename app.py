@@ -2,7 +2,7 @@ import os
 from typing import List, Tuple
 
 import fitz  # PyMuPDF
-import faiss
+import faiss 
 import numpy as np
 import streamlit as st
 from sentence_transformers import SentenceTransformer
@@ -43,14 +43,73 @@ def get_api_key() -> str:
 @st.cache_resource(show_spinner="Loading the text-embedding model...")
 def load_embedding_model():
     return SentenceTransformer(EMBEDDING_MODEL)
+import io
+import pytesseract
+from PIL import Image
 
-def extract_pdf_text(pdf_bytes: bytes) -> List[Tuple[int, str]]:
+def extract_pdf_text(pdf_bytes):
     pages = []
+
     with fitz.open(stream=pdf_bytes, filetype="pdf") as document:
         for page_index, page in enumerate(document):
-            text = page.get_text("text").strip()
-            if text:
-                pages.append((page_index + 1, text))
+            page_number = page_index + 1
+
+            # Extract normal, selectable PDF text
+            native_text = page.get_text("text").strip()
+
+            # OCR text found inside embedded images/screenshots
+            image_text_parts = []
+
+            for image_info in page.get_images(full=True):
+                xref = image_info[0]
+
+                try:
+                    image_data = document.extract_image(xref)
+                    image_bytes = image_data["image"]
+
+                    image = Image.open(
+                        io.BytesIO(image_bytes)
+                    ).convert("RGB")
+
+                    ocr_text = pytesseract.image_to_string(
+                        image,
+                        config="--psm 11"
+                    ).strip()
+
+                    if ocr_text:
+                        image_text_parts.append(ocr_text)
+
+                except Exception:
+                    # Skip an image that cannot be processed
+                    continue
+
+            combined_text = native_text
+
+            if image_text_parts:
+                combined_text += (
+                    "\n\nTEXT EXTRACTED FROM SCREENSHOTS:\n"
+                    + "\n\n".join(image_text_parts)
+                )
+
+            # If no text was found, OCR the rendered page
+            if not combined_text.strip():
+                pixmap = page.get_pixmap(
+                    matrix=fitz.Matrix(2, 2),
+                    alpha=False
+                )
+
+                rendered_image = Image.open(
+                    io.BytesIO(pixmap.tobytes("png"))
+                ).convert("RGB")
+
+                combined_text = pytesseract.image_to_string(
+                    rendered_image,
+                    config="--psm 11"
+                ).strip()
+
+            if combined_text.strip():
+                pages.append((page_number, combined_text))
+
     return pages
 
 def chunk_pages(pages: List[Tuple[int, str]]) -> List[dict]:
