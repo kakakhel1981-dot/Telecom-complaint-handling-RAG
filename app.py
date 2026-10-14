@@ -11,23 +11,20 @@ from groq import Groq
 # PAGE CONFIGURATION & PROFESSIONAL STYLING
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="Telecom Complaint Assistant | RAG Portal",
+    page_title="Telecom Complaint Assistant | Enterprise RAG",
     page_icon="📡",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom Professional CSS (Deep Navy/Slate corporate aesthetic with clean interactive buttons)
+# Custom Professional Dark Navy/Slate Telecom Theme with Interactive Elements
 st.markdown("""
     <style>
-    /* Main Background & Font */
     .stApp {
         background-color: #0B132B;
         color: #E0FBFC;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    
-    /* Sidebar Styling */
     section[data-testid="stSidebar"] {
         background-color: #1C2541;
         border-right: 1px solid #3A506B;
@@ -37,22 +34,9 @@ st.markdown("""
     section[data-testid="stSidebar"] .stMarkdown h3 {
         color: #6FFFE9;
     }
-
-    /* Card Containers */
-    .css-1r6slb0, .stChatMessage {
-        background-color: #1C2541;
-        border-radius: 10px;
-        border: 1px solid #3A506B;
-        padding: 15px;
-        margin-bottom: 10px;
-    }
-    
-    /* Headers & Titles */
     h1, h2, h3 {
         color: #6FFFE9 !important;
     }
-
-    /* Custom Buttons */
     .stButton>button {
         background-color: #00B4D8;
         color: #FFFFFF;
@@ -67,16 +51,12 @@ st.markdown("""
         color: #FFFFFF;
         box-shadow: 0 4px 12px rgba(0, 180, 216, 0.3);
     }
-
-    /* File Uploader Box */
     div[data-testid="stFileUploader"] {
         background-color: #1C2541;
         border: 2px dashed #3A506B;
         border-radius: 10px;
         padding: 15px;
     }
-    
-    /* Input field styling */
     .stTextInput>div>div>input {
         background-color: #1C2541;
         color: #E0FBFC;
@@ -126,18 +106,17 @@ def create_faiss_index(chunks):
     return index, chunks
 
 # ---------------------------------------------------------
-# MAIN APP HEADER & SIDEBAR CONFIGURATION
+# MAIN APP HEADER & SECURE SIDEBAR CONFIGURATION
 # ---------------------------------------------------------
 st.markdown("# 📡 Enterprise Telecom Complaint Handling Assistant")
-st.markdown("##### *AI-Powered Dispute Resolution & Policy Reference System*")
+st.markdown("##### *AI-Powered Dispute Resolution & Regulatory Policy Reference System*")
 st.markdown("---")
 
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/server.png", width=64)
-    st.markdown("### ⚙️ System Configuration")
+    st.markdown("### ⚙️ System Controls")
     
-    # Secure API Key configuration (hidden from main interface)
-    # Automatically checks Streamlit secrets (`st.secrets["GROQ_API_KEY"]`) or environment variables, with fallback password input in sidebar.
+    # Hidden / Secure configuration retrieval from Streamlit secrets or environment variables
     default_groq_key = ""
     try:
         if "GROQ_API_KEY" in st.secrets:
@@ -147,19 +126,20 @@ with st.sidebar:
     except Exception:
         pass
 
+    # Password input keeps the API key safely obscured
     groq_api_key_input = st.text_input(
         "Groq API Key", 
         value=default_groq_key, 
         type="password", 
-        help="Enter your Groq API key securely. It remains hidden."
+        help="Secure credential entry. Hidden from user interface."
     )
     
-    # Model specification hidden or minimized in sidebar settings
+    # Model specification hidden in sidebar settings (defaults to requested groq/openai/gpt-oss-20b model)
     selected_model = st.selectbox(
-        "LLM Model Engine",
-        ["openai/gpt-oss-20b", "llama-3.3-70b-versatile", "llama3-8b-8192"],
+        "LLM Engine",
+        ["openai/gpt-oss-20b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
         index=0,
-        help="Backend Groq LLM model engine."
+        help="High-speed Groq model backend selection."
     )
     
     st.markdown("---")
@@ -167,9 +147,9 @@ with st.sidebar:
     uploaded_file = st.file_uploader("Upload Complaint Handling Policy / SOP (PDF)", type=["pdf"])
     
     st.markdown("---")
-    st.markdown("### 💡 Quick Action Shortcuts")
+    st.markdown("### 💡 Inquiry Shortcuts")
     quick_action_preset = st.radio(
-        "Select Inquiry Template:",
+        "Select Standard Dispute Scenario:",
         [
             "None",
             "What is the SLA for billing dispute resolutions?",
@@ -194,13 +174,13 @@ if "chunks" not in st.session_state:
     st.session_state.chunks = []
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "Hello! I am your Telecom Complaint Handling Assistant. Please upload your telecom policy or SOP document in the sidebar to begin, or ask me general telecom service guidelines."}
+        {"role": "assistant", "content": "Hello! I am your Telecom Complaint Handling Assistant. Please upload your telecom policy document or SOP manual in the sidebar to begin, or select a quick query."}
     ]
 
-# Process uploaded document if present and not yet indexed
+# Document Parsing & Vector Indexing Execution
 if uploaded_file is not None:
     if "current_file" not in st.session_state or st.session_state.current_file != uploaded_file.name:
-        with st.spinner("Processing and indexing telecom document via FAISS & Sentence Transformers..."):
+        with st.spinner("Processing PDF and indexing via FAISS & Sentence Transformers..."):
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
                 tmp_file.write(uploaded_file.getvalue())
                 tmp_path = tmp_file.name
@@ -214,24 +194,22 @@ if uploaded_file is not None:
             st.session_state.faiss_index = index
             st.session_state.chunks = valid_chunks
             st.session_state.current_file = uploaded_file.name
-            st.success(f"Successfully indexed **{uploaded_file.name}** ({len(valid_chunks)} knowledge segments created).")
+            st.success(f"Successfully indexed **{uploaded_file.name}** ({len(valid_chunks)} segments created).")
 
 # ---------------------------------------------------------
-# CHAT INTERFACE & INTERACTIVE BUTTONS
+# CHAT INTERFACE & PROMPT PROCESSING
 # ---------------------------------------------------------
-st.markdown("### 💬 Complaint Resolution & Policy Assistant")
+st.markdown("### 💬 Dispute Resolution & Policy Interface")
 
-# Display chat history
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Handle quick action templates
 query_input = ""
 if quick_action_preset != "None":
     query_input = quick_action_preset
 
-user_prompt = st.chat_input("Type your customer complaint query or policy question here...")
+user_prompt = st.chat_input("Type a customer dispute query or rule question here...")
 
 if query_input and not user_prompt:
     prompt_to_process = query_input
@@ -241,21 +219,18 @@ else:
     prompt_to_process = None
 
 if prompt_to_process:
-    # Append user message
     st.session_state.messages.append({"role": "user", "content": prompt_to_process})
     with st.chat_message("user"):
         st.markdown(prompt_to_process)
 
-    # Validate API Key
     api_key_to_use = groq_api_key_input or os.environ.get("GROQ_API_KEY", "")
     if not api_key_to_use:
-        error_msg = "⚠️ **Groq API Key missing.** Please provide your API key in the sidebar configuration to execute queries."
+        error_msg = "⚠️ **Groq API Key missing.** Please input your secure Groq API key inside the sidebar configuration settings."
         st.session_state.messages.append({"role": "assistant", "content": error_msg})
         with st.chat_message("assistant"):
             st.markdown(error_msg)
     else:
-        with st.spinner("Analyzing complaint guidelines and generating response..."):
-            # Retrieval Step
+        with st.spinner("Searching telecom policy knowledge base and compiling guidance..."):
             context_text = ""
             if st.session_state.faiss_index is not None and len(st.session_state.chunks) > 0:
                 query_embedding = embedder.encode([prompt_to_process]).astype('float32')
@@ -264,12 +239,11 @@ if prompt_to_process:
                 retrieved_chunks = [st.session_state.chunks[idx] for idx in indices[0] if idx < len(st.session_state.chunks)]
                 context_text = "\n\n".join(retrieved_chunks)
             
-            # Construct Prompt for Groq
             system_prompt = (
                 "You are an expert Telecom Customer Complaint Handling Assistant. "
-                "Your job is to guide support agents and managers according to standard telecom dispute resolution procedures, "
-                "SLAs, regulatory compliance, and the provided company document context.\n\n"
-                f"Document Context:\n{context_text if context_text else 'No specific document uploaded yet. Answer based on standard telecom customer care best practices.'}"
+                "Your objective is to help support staff navigate customer complaints accurately based on telecom policies, "
+                "SLAs, regulatory guidelines, and the provided document excerpts.\n\n"
+                f"Document Context:\n{context_text if context_text else 'No specific document indexed yet. Answer based on general telecom industry standards and best practices.'}"
             )
             
             try:
@@ -291,28 +265,30 @@ if prompt_to_process:
         with st.chat_message("assistant"):
             st.markdown(response_content)
 
-# Interactive helper buttons at the bottom of chat
+# ---------------------------------------------------------
+# INTERACTIVE ACTION BUTTONS (Clickable Shortcuts)
+# ---------------------------------------------------------
 st.markdown("---")
 cols = st.columns(4)
 if cols[0].button("📋 Summarize Policy"):
     if st.session_state.chunks:
-        summary_prompt = "Provide a comprehensive executive summary of the uploaded telecom complaint handling policy document, highlighting key SLAs, compensation rules, and escalation steps."
+        summary_prompt = "Provide a structured executive summary of the uploaded telecom policy document, emphasizing timelines, compliance rules, and compensations."
         st.session_state.messages.append({"role": "user", "content": summary_prompt})
         st.rerun()
     else:
         st.warning("Please upload a PDF document first.")
 
 if cols[1].button("⚠️ Check Escalation Rules"):
-    esc_prompt = "What are the specific escalation criteria and tier transitions outlined in the complaint handling guidelines?"
+    esc_prompt = "What are the mandated escalation steps and management hand-off procedures outlined in the guidelines?"
     st.session_state.messages.append({"role": "user", "content": esc_prompt})
     st.rerun()
 
 if cols[2].button("⏱️ Review SLA Timelines"):
-    sla_prompt = "What are the mandated SLA response and resolution timelines for different priority levels of customer complaints?"
+    sla_prompt = "What are the specific SLA turnaround times for handling service outages and technical complaints?"
     st.session_state.messages.append({"role": "user", "content": sla_prompt})
     st.rerun()
 
 if cols[3].button("💬 Draft Customer Response"):
-    draft_prompt = "Provide a professional email template response for an agent dealing with an escalated billing dispute."
+    draft_prompt = "Draft a professional email reply template for an agent to send to a customer regarding a resolved billing error."
     st.session_state.messages.append({"role": "user", "content": draft_prompt})
     st.rerun()
