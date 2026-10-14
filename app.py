@@ -15,23 +15,37 @@ CHUNK_SIZE = 900
 CHUNK_OVERLAP = 150
 TOP_K = 5
 
-st.set_page_config(page_title=APP_TITLE, page_icon="📞", layout="wide")
-st.title("📞 Telecom Customer Complaint Handling Assistant")
-st.caption(
-    "Ask questions about your uploaded complaint-handling document. "
-    "Answers are grounded in the document excerpts retrieved for your question."
-)
+st.set_page_config(page_title=APP_TITLE, page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
-with st.sidebar:
-    st.subheader("Setup")
-    st.write(f"**LLM:** `{GROQ_MODEL}`")
-    st.write(f"**Embeddings:** `{EMBEDDING_MODEL}`")
-    st.info(
-        "Upload a searchable PDF. The app extracts its text, creates a local "
-        "search index for this session, and sends relevant excerpts plus your "
-        "question to Groq to generate an answer."
-    )
-    st.caption("Do not upload confidential/customer-identifying data unless your organization's policies permit it.")
+st.markdown("""
+<style>
+:root { --navy:#10243A; --blue:#183B56; --teal:#0F9D91; --ink:#172B4D; --muted:#64748B; --line:#DCE5EF; }
+[data-testid="stAppViewContainer"] { background:linear-gradient(180deg,#F7FAFD 0%,#EEF4F9 100%); color:var(--ink); }
+[data-testid="stHeader"] { background:rgba(247,250,253,.92); }
+[data-testid="stSidebar"], [data-testid="collapsedControl"] { display:none !important; }
+.block-container { max-width:1180px; padding-top:1.35rem; padding-bottom:3rem; }
+.hero { background:linear-gradient(120deg,#10243A 0%,#183B56 70%,#087F78 135%); color:#fff; padding:1.65rem 1.8rem; border-radius:22px; margin-bottom:1.2rem; box-shadow:0 12px 30px rgba(16,36,58,.14); }
+.hero-kicker { color:#8FE3D9; text-transform:uppercase; font-size:.76rem; font-weight:800; letter-spacing:.13em; margin-bottom:.45rem; }
+.hero h1 { color:#fff !important; font-size:clamp(1.65rem,3vw,2.4rem); line-height:1.15; margin:0 0 .55rem 0; font-weight:800; }
+.hero p { color:#DCEAF5 !important; font-size:1rem; margin:0; max-width:800px; }
+.section-title { font-size:1.08rem; color:#10243A; font-weight:800; margin:.35rem 0 .2rem; }
+.section-subtitle { color:#64748B; font-size:.91rem; margin-bottom:.7rem; }
+.status-card { background:#fff; border:1px solid #DCE5EF; border-radius:16px; padding:.9rem 1rem; box-shadow:0 4px 14px rgba(16,36,58,.045); min-height:82px; }
+.status-label { color:#64748B; font-size:.76rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+.status-value { color:#10243A; font-weight:800; font-size:1rem; margin-top:.25rem; overflow-wrap:anywhere; }
+div[data-testid="stFileUploader"] { background:#fff; border:1px dashed #91A8BE; border-radius:16px; padding:.7rem; }
+.stButton>button { border-radius:11px; border:1px solid #D3DEE9; background:#fff; color:#183B56; font-weight:700; min-height:2.55rem; transition:all .15s ease; }
+.stButton>button:hover { border-color:#0F9D91; color:#087F78; background:#F0FDFA; box-shadow:0 4px 12px rgba(15,157,145,.1); }
+div[data-testid="stChatInput"] { border-color:#B8C9D9; border-radius:16px; background:#fff; }
+div[data-testid="stChatMessage"] { border:1px solid #E1E9F1; border-radius:16px; padding:.8rem 1rem; background:rgba(255,255,255,.9); margin-bottom:.7rem; }
+div[data-testid="stAlert"] { border-radius:12px; }
+.footer-note { color:#718096; font-size:.78rem; text-align:center; padding-top:1rem; }
+hr { border-color:#DCE5EF; }
+</style>
+<div class="hero"><div class="hero-kicker">IT Operations · Knowledge Assistant</div>
+<h1>Telecom Customer Complaint Assistant</h1>
+<p>Find approved troubleshooting guidance faster. Upload your complaint-handling document, ask in plain language, and review the source pages behind each answer.</p></div>
+""", unsafe_allow_html=True)
 
 def get_api_key() -> str:
     try:
@@ -140,27 +154,22 @@ def clear_chat():
 
 api_key = get_api_key()
 if not api_key:
-    st.warning(
-        "Groq API key is not configured. In Streamlit Cloud, open your app's "
-        "**Settings → Secrets** and add `GROQ_API_KEY = \"your_key_here\"`. "
-        "Never paste your API key into this chat or commit it to GitHub."
-    )
+    st.warning('Assistant setup is incomplete: add `GROQ_API_KEY` in Streamlit Cloud → Settings → Secrets.')
 
-uploaded_file = st.file_uploader("Upload complaint-handling document (searchable PDF)", type=["pdf"])
+st.markdown('<div class="section-title">1. Add your knowledge document</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-subtitle">Upload a searchable PDF of your approved complaint-handling procedures.</div>', unsafe_allow_html=True)
+uploaded_file = st.file_uploader("Choose a complaint-handling PDF", type=["pdf"], key="complaint_pdf_uploader", help="Searchable PDFs work best. Scanned PDFs may need OCR first.")
 
 if uploaded_file is not None:
     current_signature = f"{uploaded_file.name}:{uploaded_file.size}"
     if st.session_state.get("document_signature") != current_signature:
-        with st.spinner("Reading the PDF and preparing the searchable index..."):
+        with st.spinner("Preparing your document for question answering..."):
             try:
                 pages = extract_pdf_text(uploaded_file.getvalue())
                 if not pages:
                     st.session_state.pop("chunks", None)
                     st.session_state.pop("faiss_index", None)
-                    st.error(
-                        "No selectable text was found. This may be a scanned PDF. "
-                        "Use a searchable/OCR-processed PDF and upload it again."
-                    )
+                    st.error("No selectable text was found. This may be a scanned PDF. Upload an OCR-processed searchable PDF.")
                 else:
                     chunks = chunk_pages(pages)
                     if not chunks:
@@ -173,74 +182,90 @@ if uploaded_file is not None:
                         st.session_state["document_signature"] = current_signature
                         st.session_state["document_name"] = uploaded_file.name
                         st.session_state["messages"] = []
-                        st.success(
-                            f"Ready: **{uploaded_file.name}** — "
-                            f"{len(pages)} text pages, {len(chunks)} searchable chunks."
-                        )
+                        st.session_state.pop("pending_question", None)
+                        st.success(f"Document ready: {uploaded_file.name} · {len(pages)} pages · {len(chunks)} searchable sections")
             except Exception as exc:
                 st.error(f"Could not process this PDF: {exc}")
 
-if st.session_state.get("faiss_index") is not None:
-    st.caption(f"Current document: **{st.session_state.get('document_name', 'Uploaded PDF')}**")
-    if st.button("Clear conversation", on_click=clear_chat):
-        pass
+has_document = st.session_state.get("faiss_index") is not None
+doc_name = st.session_state.get("document_name", "No document uploaded")
+status_col1, status_col2 = st.columns([2, 1])
+with status_col1:
+    value = "📄 " + doc_name if has_document else "Waiting for PDF upload"
+    st.markdown(f'<div class="status-card"><div class="status-label">Current knowledge document</div><div class="status-value">{value}</div></div>', unsafe_allow_html=True)
+with status_col2:
+    status = "🟢 Ready to assist" if has_document and api_key else ("🟠 API key needed" if has_document else "⚪ Awaiting document")
+    st.markdown(f'<div class="status-card"><div class="status-label">Assistant status</div><div class="status-value">{status}</div></div>', unsafe_allow_html=True)
+
+if has_document:
+    st.divider()
+    action_col, _, clear_col = st.columns([1.45, 2.5, 1.15])
+    with action_col:
+        if st.button("＋ New conversation", use_container_width=True):
+            st.session_state["messages"] = []
+            st.session_state.pop("pending_question", None)
+            st.rerun()
+    with clear_col:
+        if st.button("Clear chat", use_container_width=True):
+            st.session_state["messages"] = []
+            st.session_state.pop("pending_question", None)
+            st.rerun()
+
+    st.markdown('<div class="section-title">2. Ask your question</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-subtitle">Choose a suggested question or type your own below.</div>', unsafe_allow_html=True)
+    q1, q2, q3 = st.columns(3)
+    with q1:
+        if st.button("SIM modification overview", use_container_width=True):
+            st.session_state["pending_question"] = "What is SIM modification?"
+            st.rerun()
+    with q2:
+        if st.button("Applications involved", use_container_width=True):
+            st.session_state["pending_question"] = "Which applications are involved?"
+            st.rerun()
+    with q3:
+        if st.button("Troubleshooting steps", use_container_width=True):
+            st.session_state["pending_question"] = "What are the documented troubleshooting steps?"
+            st.rerun()
 
     for message in st.session_state.get("messages", []):
-        with st.chat_message(message["role"]):
+        with st.chat_message(message["role"], avatar="📡" if message["role"] == "assistant" else None):
             st.markdown(message["content"])
             if message.get("sources"):
-                with st.expander("Retrieved document excerpts"):
+                with st.expander("📚 View document excerpts used for this answer"):
                     for source in message["sources"]:
                         st.markdown(f"**Page {source['page']}** · relevance score `{source['score']:.3f}`")
                         st.write(source["text"])
+                        st.divider()
 
-    question = st.chat_input("How can I help you with this document?")
+    pending_question = st.session_state.pop("pending_question", None)
+    typed_question = st.chat_input("How can I help you with this complaint-handling document?")
+    question = pending_question or typed_question
     if question:
-        st.session_state.setdefault("messages", []).append(
-            {"role": "user", "content": question}
-        )
+        st.session_state.setdefault("messages", []).append({"role": "user", "content": question})
         with st.chat_message("user"):
             st.markdown(question)
-
-        with st.chat_message("assistant"):
+        with st.chat_message("assistant", avatar="📡"):
             if not api_key:
-                answer = "Groq API key is missing. Add `GROQ_API_KEY` in Streamlit Cloud → Settings → Secrets, then try again."
+                answer = "The Groq API key is not configured. Add `GROQ_API_KEY` in Streamlit Cloud → Settings → Secrets, then try again."
                 sources = []
             else:
                 try:
                     embedding_model = load_embedding_model()
-                    sources = retrieve(
-                        question,
-                        st.session_state["faiss_index"],
-                        st.session_state["chunks"],
-                        embedding_model,
-                    )
-                    with st.spinner("Searching the document and preparing an answer..."):
+                    sources = retrieve(question, st.session_state["faiss_index"], st.session_state["chunks"], embedding_model)
+                    with st.spinner("Searching the document and preparing your answer..."):
                         answer = generate_answer(question, sources, api_key)
                 except Exception as exc:
-                    answer = (
-                        "I couldn't complete the request. Check that your Groq key is valid, "
-                        "the selected model is available to your account, and try again. "
-                        f"Technical detail: {exc}"
-                    )
+                    answer = "I couldn't complete the request. Check your Groq API key and model availability, then try again. Technical detail: " + str(exc)
                     sources = []
             st.markdown(answer)
             if sources:
-                with st.expander("Retrieved document excerpts"):
+                with st.expander("📚 View document excerpts used for this answer"):
                     for source in sources:
                         st.markdown(f"**Page {source['page']}** · relevance score `{source['score']:.3f}`")
                         st.write(source["text"])
-        st.session_state["messages"].append(
-            {"role": "assistant", "content": answer, "sources": sources}
-        )
+                        st.divider()
+        st.session_state["messages"].append({"role": "assistant", "content": answer, "sources": sources})
 else:
-    st.markdown(
-        "Start by uploading your complaint-handling PDF. Then ask naturally, for example:\n"
-        "- What is SIM modification?\n"
-        "- Which applications are involved?\n"
-        "- Explain the documented procedure for order deletion.\n"
-        "- What are the documented fixture steps?"
-    )
+    st.markdown('<div class="status-card"><div class="status-label">Getting started</div><div class="status-value">Upload a PDF to start your conversation</div><p style="color:#64748B;margin:.45rem 0 0;">Once your document is indexed, ask about a procedure, application, complaint type, or troubleshooting step described in the document.</p></div>', unsafe_allow_html=True)
 
-st.divider()
-st.caption("Developed as a document-grounded RAG assistant. Always verify operational actions against approved procedures.")
+st.markdown('<div class="footer-note">Document-grounded support · Verify operational actions against approved procedures · No direct Siebel or Oracle connection</div>', unsafe_allow_html=True)
