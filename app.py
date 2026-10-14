@@ -8,7 +8,7 @@ import streamlit as st
 from sentence_transformers import SentenceTransformer
 from groq import Groq
 
-APP_TITLE = "Telecom Customer Complaint Handling Assistant"
+APP_TITLE = "Customer Complaint Handling Assistant"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 GROQ_MODEL = "openai/gpt-oss-20b"
 CHUNK_SIZE = 900
