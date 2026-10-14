@@ -16,7 +16,7 @@ CHUNK_OVERLAP = 150
 TOP_K = 5
 
 st.set_page_config(page_title=APP_TITLE, page_icon="📞", layout="wide")
-st.title("📞 Telecom Customer Complaint Handling Assistant")
+st.title("📞 Customer Complaint Handling Assistant")
 st.caption(
     "Ask questions about your uploaded complaint-handling document. "
     "Answers are grounded in the document excerpts retrieved for your question."
